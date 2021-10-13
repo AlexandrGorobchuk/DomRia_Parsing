@@ -47,7 +47,7 @@ namespace DomRia_Parsing
                             JObject jsonAds = JObject.Parse(parseforAds.Source.Text);
 
                             string location = $"ул. {jsonAds["street_name"]}, р‑н. {jsonAds["district_name"]}, г. {jsonAds["city_name"]}";
-                            string price = $"{jsonAds["price"]} + {jsonAds["currency_type"]}";
+                            string price = $"{jsonAds["price"]}{jsonAds["currency_type"]}";
                             string publishing_date = $"{jsonAds["publishing_date"]}";
                             string beautiful_url = "https://dom.ria.com/ru/" + $"{jsonAds["beautiful_url"]}";
                             string apartment = $"Комнат: {jsonAds["rooms_count"]} • {jsonAds["floor"]} этаж из {jsonAds["floors_count"]} • {jsonAds["total_square_meters"]}м²";
