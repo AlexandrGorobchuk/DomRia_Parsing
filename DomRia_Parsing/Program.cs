@@ -22,6 +22,7 @@ namespace DomRia_Parsing
         static readonly ChatId chatId = "-1001588392048";
         public static async Task Main(string[] args)
         {
+            Console.WriteLine($"Start parsing {DateTime.Now}");
             for (int i = 0; ; i++)
             {
                 try
@@ -36,11 +37,11 @@ namespace DomRia_Parsing
                             continue;
                         }
                         JArray jsonArray = (JArray)json["items"];
-                        List<string> list = jsonArray.Select(x => (string)x).ToList();
-                        IEnumerable<string> listNewID = list.Except(AdsIdList);
-                        foreach (string id in listNewID)
+                        List<string> listId = jsonArray.Select(x => (string)x).ToList();
+                        IEnumerable<string> listIdNewAds = listId.Except(AdsIdList);
+                        foreach (string id in listIdNewAds)
                         {
-                            AdsIdList.Add(id);
+                            Console.WriteLine($"New Ads {DateTime.Now}");
                             string urlAds = $"https://dom.ria.com/node/searchEngine/v2/view/realty/{id}?lang_id=4";
                             IDocument parseforAds = await Parser.ParseDocumentAsync(await client.GetStringAsync(urlAds));
                             JObject jsonAds = JObject.Parse(parseforAds.Source.Text);
@@ -49,14 +50,15 @@ namespace DomRia_Parsing
                             string price = $"{jsonAds["price"]} + {jsonAds["currency_type"]}";
                             string publishing_date = $"{jsonAds["publishing_date"]}";
                             string beautiful_url = "https://dom.ria.com/ru/" + $"{jsonAds["beautiful_url"]}";
-                            string apartment = $"Комнат: {jsonAds["rooms_count"]} • {jsonAds["floor"]} этаж из {jsonAds["floors_count"]}  • {jsonAds["total_square_meters"]}м²";
+                            string apartment = $"Комнат: {jsonAds["rooms_count"]} • {jsonAds["floor"]} этаж из {jsonAds["floors_count"]} • {jsonAds["total_square_meters"]}м²";
                             string telegramMessage =
                                 $"<b><a href='{beautiful_url}'>{location}</a></b>\n" +
                                 $"<b>Стоимость:</b> {price}\n" +
                                 $"<b>Детально:</b> {apartment}\n" +
-                                $"<b>Время:</b> {publishing_date}\n";
+                                $"<b>Дата публикции:</b> {publishing_date}\n";
 
                             bot.SendTextMessageAsync(chatId, telegramMessage, ParseMode.Html).Wait();
+                            AdsIdList.Add(id);
                         }
                         await Task.Delay(2000);
                     }
