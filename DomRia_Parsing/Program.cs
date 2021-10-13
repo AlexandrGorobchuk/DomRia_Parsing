@@ -36,37 +36,17 @@ namespace DomRia_Parsing
                                 await Task.Delay(2000);
                                 continue;
                             }
-
-                            JArray plans = (JArray)json["items"];
-                            if (AdsIdList.Count == 0) {
-                                AdsIdList.AddRange(plans.Select(x => (string)x).ToList());
-                                Console.WriteLine($"Итерация {i}. Получен список объявлений. Колличество {AdsIdList.Count()}");
-                                await Task.Delay(2000);
-                                //continue;
+                            Console.WriteLine("Итерация " + i + ". Получен список объявлений");
+                            foreach (var index in TableHtml)
+                            {
+                                AdsIdList.Add(index.GetAttribute("id").ToString());
                             }
-                            List<string> list = plans.Select(x => (string)x).ToList();
-                            IEnumerable<string> exceptIdList = list.Except(AdsIdList); ;
-                            
-                            foreach (string value in exceptIdList) {
-                                Console.WriteLine($"Объявления найденно. Id = {value}") ;
-                                AdsIdList.Add(value);
-                                string urlParse = $"https://dom.ria.com/node/searchEngine/v2/view/realty/{value}?lang_id=4";
-                                IDocument searcheForId = await Parser.ParseDocumentAsync(await client.GetStringAsync(urlParse));
-                                JObject j = JObject.Parse(searcheForId.Source.Text);
-                                Console.WriteLine(j.Root);
-                                Console.WriteLine("===========================================================");
-                            }
-                            
                         }
                     }
                     catch (Exception e) {
                         Console.WriteLine(e.Message);
                     }
                 }
-            }
-            catch (Exception e) {
-                Console.WriteLine(e.Message);
-            }
         }
 
         static void SearchNewAd(List<IElement> TableHtml)
@@ -74,27 +54,30 @@ namespace DomRia_Parsing
             foreach (var index in TableHtml)
             {
                 string adsId = index.GetAttribute("id").ToString();
-                if (AdsIdList.Contains(adsId))
-                    continue;
-                Console.WriteLine("Объявление найдено");
-                AdsIdList.Add(adsId);
-                Program.NewAd(index);
+                if (!AdsIdList.Contains(adsId))
+                {
+                    AdsIdList.Add(adsId);
+                    NewAd(index);
+                }
             }
         }
 
         static void NewAd(IElement value)
         {
-            String title = value.QuerySelector("div.wrap_desc > h3 > a > span").InnerHtml;
-            String url = "https://dom.ria.com/" + value.QuerySelector("div.wrap_desc > h3 > a").GetAttribute("href");
-            String price = value.QuerySelector("div.wrap_desc > div.mb-5.mt-10.pr > b.green.size22").InnerHtml;
-            String location = value.QuerySelector("div.wrap_desc > h3 > span > a:nth-child(1)").TextContent;
-            String time = value.QuerySelector("div.wrap_desc > div.mt-10.clear-foot > div > time").TextContent;
-            Console.WriteLine(title);
-            string token = "1997294527:AAEkeioj8U3u7EaXkFftyxqcqnraVrcvVxs";
-            var bot = new TelegramBotClient(token);
-            ChatId chatId = "-1001588392048";
-            bot.SendTextMessageAsync(chatId, $"<b>{title}</b>\n<b>Стоимость:</b> {price}\n<b>Локация:</b> {location}\n<b>Время:</b> {time}\n<a href='{url}'>Ссылка</a>", ParseMode.Html).Wait();
+            try
+            {
+                String title = value.QuerySelector("div.wrap_desc > h3 > a > span").TextContent;
+                String url = "https://dom.ria.com/" + value.QuerySelector("div.wrap_desc > h3 > a").GetAttribute("href");
+                String price = value.QuerySelector("div.wrap_desc > div.mb-5.mt-10.pr > b.green.size22").InnerHtml;
+                String location = value.QuerySelector("div.wrap_desc > h3 > span > a:nth-child(1)").TextContent;
+                String time = value.QuerySelector("div.wrap_desc > div.mt-10.clear-foot > div > time").TextContent;
+                var bot = new TelegramBotClient("1997294527:AAEkeioj8U3u7EaXkFftyxqcqnraVrcvVxs");
+                ChatId chatId = "-1001588392048";
+                bot.SendTextMessageAsync(chatId, $"<b>{title}</b>\n<b>Стоимость:</b> {price}\n<b>Локация:</b> {location}\n<b>Время:</b> {time}\n<a href='{url}'>Ссылка</a>", ParseMode.Html).Wait();
+            }
+            catch (Exception e) {
+                Console.WriteLine(e.Message);
+            }
         }
-
     }
 }
