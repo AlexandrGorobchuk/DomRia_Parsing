@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using Telegram.Bot;
@@ -19,19 +20,22 @@ namespace DomRia_Parsing
     class Program
     {
         //static string Url_parse = "https://dom.ria.com/node/searchEngine/v2/?links-under-filter=on&category=1&realty_type=2&operation_type=1&fullCategoryOperation=1_2_1&wo_dupl=1&page=0&state_id=12&city_id=12&limit=20&sort=inspected_sort&period=per_hour&ch=242_239,247_252,265_0,1437_1436:";
-        static readonly string Url_parse = "https://dom.ria.com/node/searchEngine/v2/?links-under-filter=on&category=1&realty_type=2&operation_type=1&fullCategoryOperation=1_2_1&wo_dupl=1&page=0&state_id=12&city_id=12&limit=20&sort=inspected_sort&period=per_allday&ch=242_239,247_252,265_0,1437_1436:";
+        static readonly string Url_parse = "https://dom.ria.com/node/searchEngine/v2/?links-under-filter=on&category=1&realty_type=2&operation_type=1&fullCategoryOperation=1_2_1&wo_dupl=1&page=0&state_id=12&city_id=12&limit=60&sort=inspected_sort&period=per_allday&ch=242_239,247_252,265_0,1437_1436:";
         static readonly IHtmlParser Parser = new HtmlParser();
         static readonly string Path = Directory.GetCurrentDirectory() + @"\listAds.txt";
         static readonly List<string> AdsIdList = GetAdsList();
         static readonly TelegramBotClient BotClient = new TelegramBotClient("1997294527:AAEkeioj8U3u7EaXkFftyxqcqnraVrcvVxs");
         static readonly ChatId ChatIdNumber = "-1001588392048";
+        static readonly int pause = 60000;
 
         public static async Task Main(string[] args)
         {
             Console.WriteLine($"Start parsing {DateTime.Now}");
             for (int i = 0; ; i++)
             {
-                Console.WriteLine($"\n> New Iteration #{i}. {DateTime.Now}");
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"\nNew Iteration #{i}. {DateTime.Now}");
+                Console.ForegroundColor = ConsoleColor.White;
                 try
                 {
                     using (var client = new HttpClient())
@@ -40,14 +44,14 @@ namespace DomRia_Parsing
                         JObject json = JObject.Parse(html.Source.Text); //Если Item = 0, то исключение
                         if (json["count"].ToString().Equals("0"))
                         {
-                            await Task.Delay(100000);
+                            await Task.Delay(pause);
                             continue;
                         }
                         JArray jsonArray = (JArray)json["items"];
                         List<string> listIdFromSite = jsonArray.Select(x => (string)x).ToList();
                         IEnumerable<string> listIdNewAds = listIdFromSite.Except(AdsIdList);
 
-                        Console.WriteLine("AdsIdList Cont - {0}\nlistIdFromSite Cont - {1}\nlistIdNewAds Cont - {2}", AdsIdList.Count(), listIdFromSite.Count(), listIdNewAds.Count());
+                        Console.WriteLine("  AdsIdList Cont - {0}\n  listIdFromSite Cont - {1}\n listIdNewAds Cont - {2}", AdsIdList.Count(), listIdFromSite.Count(), listIdNewAds.Count());
                         foreach (string id in listIdNewAds)
                         {
                             Console.WriteLine($"New Ads {DateTime.Now}. Id = {id}");
@@ -69,20 +73,19 @@ namespace DomRia_Parsing
                             bot.SendTextMessageAsync(chatId, telegramMessage, ParseMode.Html).Wait();
                             */
                             AdsIdList.Insert(0, id);
-                            Console.WriteLine($"AdsIdList[0] = {AdsIdList[0]}");
+                            Console.WriteLine($"  AdsIdList[0] = {AdsIdList[0]}");
 
                         }
-
-                        WriteNewAdsInList(AdsIdList);
-                        await Task.Delay(100000);
+                        Thread thread = new Thread(WriteNewAdsInList);
+                        thread.IsBackground = true;
+                        thread.Start();
                     }
-
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine(e.Message);
                 }
-                await Task.Delay(100000);
+                await Task.Delay(pause);
             }
         }
 
@@ -103,11 +106,10 @@ namespace DomRia_Parsing
             }
         }
 
-        async static void WriteNewAdsInList(List<string> value)
+        static void WriteNewAdsInList()
         {
-            await using (XmlWriter streamWriter = new XmlTextWriter(Path, null))
+            using (XmlWriter streamWriter = new XmlTextWriter(Path, null))
                     new DataContractJsonSerializer(typeof(List<string>)).WriteObject(streamWriter, AdsIdList);
-            Console.WriteLine($"Object Serialize. Count = {value.Count()}");
         }
     }
 }
