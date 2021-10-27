@@ -38,21 +38,19 @@ namespace DomRia_Parsing
                     {
                         IDocument html = await Parser.ParseDocumentAsync(await client.GetStringAsync(Url_parse));
                         JObject json = JObject.Parse(html.Source.Text); //Если Item = 0, то исключение
-                        if (json["count"].ToString().Contains("0"))
+                        if (json["count"].ToString().Equals("0"))
                         {
                             await Task.Delay(100000);
                             continue;
                         }
                         JArray jsonArray = (JArray)json["items"];
                         List<string> listIdFromSite = jsonArray.Select(x => (string)x).ToList();
-
-                        Console.WriteLine("AdsIdList Cont - " + AdsIdList.Count() );
-                        Console.WriteLine("listIdFromSite Cont - " + listIdFromSite.Count());
-
                         IEnumerable<string> listIdNewAds = listIdFromSite.Except(AdsIdList);
+
+                        Console.WriteLine("AdsIdList Cont - {0}\nlistIdFromSite Cont - {1}\nlistIdNewAds Cont - {2}", AdsIdList.Count(), listIdFromSite.Count(), listIdNewAds.Count());
                         foreach (string id in listIdNewAds)
                         {
-                            Console.WriteLine($"New Ads {DateTime.Now}");
+                            Console.WriteLine($"New Ads {DateTime.Now}. Id = {id}");
                             string urlAds = $"https://dom.ria.com/node/searchEngine/v2/view/realty/{id}?lang_id=4";
                             IDocument parseforAds = await Parser.ParseDocumentAsync(await client.GetStringAsync(urlAds));
                             JObject jsonAds = JObject.Parse(parseforAds.Source.Text);
@@ -70,7 +68,8 @@ namespace DomRia_Parsing
 
                             bot.SendTextMessageAsync(chatId, telegramMessage, ParseMode.Html).Wait();
                             */
-                            AdsIdList.Add(id);
+                            AdsIdList.Insert(0, id);
+                            Console.WriteLine($"AdsIdList[0] = {AdsIdList[0]}");
 
                         }
 
