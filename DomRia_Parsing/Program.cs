@@ -6,7 +6,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization.Json;
 using System.Threading.Tasks;
+using System.Xml;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -15,32 +18,38 @@ namespace DomRia_Parsing
 {
     class Program
     {
-        //static string url_parse = "https://dom.ria.com/node/searchEngine/v2/?links-under-filter=on&category=1&realty_type=2&operation_type=1&fullCategoryOperation=1_2_1&wo_dupl=1&page=0&state_id=12&city_id=12&limit=20&sort=inspected_sort&period=per_hour&ch=242_239,247_252,265_0,1437_1436:";
-        static string url_parse = "https://dom.ria.com/node/searchEngine/v2/?links-under-filter=on&category=1&realty_type=2&operation_type=1&fullCategoryOperation=1_2_1&wo_dupl=1&page=0&state_id=12&city_id=12&limit=20&sort=inspected_sort&period=per_day&ch=242_239,247_252,265_0,1437_1436:";
+        //static string Url_parse = "https://dom.ria.com/node/searchEngine/v2/?links-under-filter=on&category=1&realty_type=2&operation_type=1&fullCategoryOperation=1_2_1&wo_dupl=1&page=0&state_id=12&city_id=12&limit=20&sort=inspected_sort&period=per_hour&ch=242_239,247_252,265_0,1437_1436:";
+        static readonly string Url_parse = "https://dom.ria.com/node/searchEngine/v2/?links-under-filter=on&category=1&realty_type=2&operation_type=1&fullCategoryOperation=1_2_1&wo_dupl=1&page=0&state_id=12&city_id=12&limit=20&sort=inspected_sort&period=per_allday&ch=242_239,247_252,265_0,1437_1436:";
         static readonly IHtmlParser Parser = new HtmlParser();
+        static readonly string Path = Directory.GetCurrentDirectory() + @"\listAds.txt";
         static readonly List<string> AdsIdList = GetAdsList();
-        static readonly TelegramBotClient bot = new TelegramBotClient("1997294527:AAEkeioj8U3u7EaXkFftyxqcqnraVrcvVxs");
-        static readonly ChatId chatId = "-1001588392048";
+        static readonly TelegramBotClient BotClient = new TelegramBotClient("1997294527:AAEkeioj8U3u7EaXkFftyxqcqnraVrcvVxs");
+        static readonly ChatId ChatIdNumber = "-1001588392048";
 
         public static async Task Main(string[] args)
         {
             Console.WriteLine($"Start parsing {DateTime.Now}");
             for (int i = 0; ; i++)
             {
+                Console.WriteLine($"\n> New Iteration #{i}. {DateTime.Now}");
                 try
                 {
                     using (var client = new HttpClient())
                     {
-                        IDocument html = await Parser.ParseDocumentAsync(await client.GetStringAsync(url_parse));
+                        IDocument html = await Parser.ParseDocumentAsync(await client.GetStringAsync(Url_parse));
                         JObject json = JObject.Parse(html.Source.Text); //Если Item = 0, то исключение
                         if (json["count"].ToString().Contains("0"))
                         {
-                            await Task.Delay(2000);
+                            await Task.Delay(100000);
                             continue;
                         }
                         JArray jsonArray = (JArray)json["items"];
-                        List<string> listId = jsonArray.Select(x => (string)x).ToList();
-                        IEnumerable<string> listIdNewAds = listId.Except(AdsIdList);
+                        List<string> listIdFromSite = jsonArray.Select(x => (string)x).ToList();
+
+                        Console.WriteLine("AdsIdList Cont - " + AdsIdList.Count() );
+                        Console.WriteLine("listIdFromSite Cont - " + listIdFromSite.Count());
+
+                        IEnumerable<string> listIdNewAds = listIdFromSite.Except(AdsIdList);
                         foreach (string id in listIdNewAds)
                         {
                             Console.WriteLine($"New Ads {DateTime.Now}");
@@ -64,8 +73,9 @@ namespace DomRia_Parsing
                             AdsIdList.Add(id);
 
                         }
+
                         WriteNewAdsInList(AdsIdList);
-                        await Task.Delay(2000);
+                        await Task.Delay(100000);
                     }
 
                 }
@@ -73,35 +83,32 @@ namespace DomRia_Parsing
                 {
                     Console.WriteLine(e.Message);
                 }
+                await Task.Delay(100000);
             }
         }
 
         static List<string> GetAdsList()
         {
-            string path = Directory.GetCurrentDirectory() + @"\listAds.txt";
-            Console.WriteLine(path);
-            StreamReader streamReader = new StreamReader(path);
-            if (streamReader.Read().Equals(-1))
+            new FileStream(Path, FileMode.OpenOrCreate).Close();
+            using (XmlReader streamReader = new XmlTextReader(Path))
             {
-                streamReader.Close();
-                return new List<string>() { null };
+                DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<string>));
+                try
+                {
+                    return jsonSerializer.ReadObject(streamReader) as List<string>;
+                }
+                catch
+                {
+                    return new List<string>();
+                }
             }
-
-            var list = streamReader.ReadToEnd().Split("\n").ToList();
-            streamReader.Close();
-            return list;
         }
 
-        static void WriteNewAdsInList(List<string> value)
+        async static void WriteNewAdsInList(List<string> value)
         {
-            string path = Directory.GetCurrentDirectory() + @"\listAds.txt";
-            StreamWriter streamWriter = new StreamWriter(path);
-            string st = "";
-            value.ForEach(x => streamWriter.Write("\n" + x));
-
-
-            streamWriter.Close();
-
+            await using (XmlWriter streamWriter = new XmlTextWriter(Path, null))
+                    new DataContractJsonSerializer(typeof(List<string>)).WriteObject(streamWriter, AdsIdList);
+            Console.WriteLine($"Object Serialize. Count = {value.Count()}");
         }
     }
 }
